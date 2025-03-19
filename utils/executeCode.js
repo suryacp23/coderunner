@@ -18,7 +18,7 @@ export async function runCode(language, code, inputData = "") {
       return resolve({ success: false, error: "File size exceeds 1MB limit" });
     }
 
-    enforceFileLimit(); // Ensure max 50 files in sandbox
+    enforceFileLimit(); // Ensure max 5 files in sandbox
 
     const filename = `code_${Date.now()}`;
     const filepath = path.join(TMP_DIR, filename);
@@ -36,10 +36,18 @@ export async function runCode(language, code, inputData = "") {
         args = [cppFilePath, "-o", compiledFile];
 
         const compileProcess = spawn(command, args);
+        let compileError = "";
+        compileProcess.stderr.on("data", (data) => {
+          compileError += data.toString();
+        });
+
         compileProcess.on("exit", (code) => {
           if (code !== 0) {
             cleanUpFiles([cppFilePath]);
-            resolve({ success: false, error: "Compilation failed" });
+            resolve({
+              success: false,
+              error: compileError || "Compilation failed",
+            });
           } else {
             executeProcess(
               compiledFile,
@@ -72,14 +80,22 @@ export async function runCode(language, code, inputData = "") {
         args = [javaFilePath];
 
         const javaCompileProcess = spawn(command, args);
+        let javaCompileError = "";
+        javaCompileProcess.stderr.on("data", (data) => {
+          javaCompileError += data.toString();
+        });
+
         javaCompileProcess.on("exit", (code) => {
           if (code !== 0) {
             cleanUpFiles([javaFilePath]);
-            resolve({ success: false, error: "Compilation failed" });
+            resolve({
+              success: false,
+              error: javaCompileError || "Compilation failed",
+            });
           } else {
             executeProcess(
               "java",
-              ["-cp", TMP_DIR, "Main"], // Ensure correct class execution
+              ["-cp", TMP_DIR, "Main"],
               resolve,
               [javaFilePath, path.join(TMP_DIR, "Main.class")],
               inputData
