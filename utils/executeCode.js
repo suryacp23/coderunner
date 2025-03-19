@@ -38,10 +38,52 @@ export async function runCode(language, code, inputData = "") {
         const compileProcess = spawn(command, args);
         compileProcess.on("exit", (code) => {
           if (code !== 0) {
-            cleanUpFiles([cppFilePath]); // Cleanup source file if compilation fails
+            cleanUpFiles([cppFilePath]);
             resolve({ success: false, error: "Compilation failed" });
           } else {
-            executeProcess(compiledFile, [], resolve, [cppFilePath, compiledFile], inputData);
+            executeProcess(
+              compiledFile,
+              [],
+              resolve,
+              [cppFilePath, compiledFile],
+              inputData
+            );
+          }
+        });
+        return;
+
+      case "python":
+        extension = ".py";
+        const pyFilePath = filepath + extension;
+        fs.writeFileSync(pyFilePath, code);
+
+        command = "python3";
+        args = [pyFilePath];
+
+        executeProcess(command, args, resolve, [pyFilePath], inputData);
+        return;
+
+      case "java":
+        extension = ".java";
+        const javaFilePath = path.join(TMP_DIR, "Main.java"); // Ensure correct filename
+        fs.writeFileSync(javaFilePath, code);
+
+        command = "javac";
+        args = [javaFilePath];
+
+        const javaCompileProcess = spawn(command, args);
+        javaCompileProcess.on("exit", (code) => {
+          if (code !== 0) {
+            cleanUpFiles([javaFilePath]);
+            resolve({ success: false, error: "Compilation failed" });
+          } else {
+            executeProcess(
+              "java",
+              ["-cp", TMP_DIR, "Main"], // Ensure correct class execution
+              resolve,
+              [javaFilePath, path.join(TMP_DIR, "Main.class")],
+              inputData
+            );
           }
         });
         return;
@@ -53,7 +95,13 @@ export async function runCode(language, code, inputData = "") {
 }
 
 // Function to execute compiled code and clean up files
-function executeProcess(command, args, resolve, filesToDelete = [], inputData = "") {
+function executeProcess(
+  command,
+  args,
+  resolve,
+  filesToDelete = [],
+  inputData = ""
+) {
   const process = spawn(command, args, {
     timeout: 5000, // Max execution time: 5 sec
     detached: true,
